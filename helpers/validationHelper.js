@@ -1,105 +1,117 @@
-const Joi = require('joi');
-
 class ValidationHelper {
-  validateRegistration(data) {
-    const schema = Joi.object({
-      username: Joi.string()
-        .min(8)
-        .pattern(/^[A-Za-z]+$/)
-        .required()
-        .messages({
-          'string.min': 'Username must be at least 8 characters',
-          'string.pattern.base': 'Username must contain only letters (A-Z, a-z)',
-          'any.required': 'Username is required'
-        }),
-      password: Joi.string()
-        .min(6)
-        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-        .required()
-        .messages({
-          'string.min': 'Password must be at least 6 characters',
-          'string.pattern.base': 'Password must contain uppercase, lowercase, number and special character',
-          'any.required': 'Password is required'
-        })
-    });
+  static validateSearchParams({ search, type, year }) {
+    const errors = [];
 
-    return schema.validate(data, { abortEarly: false });
+    if (!search || search.trim().length === 0) {
+      errors.push("Search query is required");
+    }
+
+    if (search && search.length < 2) {
+      errors.push("Search query must be at least 2 characters long");
+    }
+
+    if (type && !["movie", "series", "episode"].includes(type)) {
+      errors.push("Type must be one of: movie, series, episode");
+    }
+
+    if (
+      year &&
+      (isNaN(year) || year < 1900 || year > new Date().getFullYear())
+    ) {
+      errors.push("Year must be a valid year between 1900 and current year");
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
   }
 
-  validateLogin(data) {
-    const schema = Joi.object({
-      username: Joi.string()
-        .min(8)
-        .pattern(/^[A-Za-z]+$/)
-        .required()
-        .messages({
-          'string.min': 'Username must be at least 8 characters',
-          'string.pattern.base': 'Username must contain only letters',
-          'any.required': 'Username is required'
-        }),
-      password: Joi.string()
-        .min(6)
-        .required()
-        .messages({
-          'string.min': 'Password must be at least 6 characters',
-          'any.required': 'Password is required'
-        })
-    });
-
-    return schema.validate(data, { abortEarly: false });
+  static validateImdbId(imdbID) {
+    const imdbPattern = /^tt\d{7,8}$/;
+    return {
+      isValid: imdbPattern.test(imdbID),
+      errors: imdbPattern.test(imdbID) ? [] : ["Invalid IMDB ID format"],
+    };
   }
 
-  validateMovieSearch(data) {
-    const schema = Joi.object({
-      search: Joi.string()
-        .min(1)
-        .required()
-        .messages({
-          'string.min': 'Search term must not be empty',
-          'any.required': 'Search term is required'
-        }),
-      type: Joi.string()
-        .valid('movie', 'series', 'episode')
-        .default('movie')
-        .messages({
-          'any.only': 'Type must be movie, series, or episode'
-        }),
-      year: Joi.number()
-        .integer()
-        .min(1900)
-        .max(new Date().getFullYear() + 1)
-        .optional()
-        .messages({
-          'number.min': 'Year must be after 1900',
-          'number.max': 'Year cannot be in the future'
-        }),
-      page: Joi.number()
-        .integer()
-        .min(1)
-        .max(100)
-        .default(1)
-        .messages({
-          'number.min': 'Page must be at least 1',
-          'number.max': 'Page cannot exceed 100'
-        })
-    });
+  static validateRegistrationData({ username, email, password }) {
+    const errors = [];
 
-    return schema.validate(data, { abortEarly: false });
+    if (!username || username.trim().length === 0) {
+      errors.push("Username is required");
+    } else if (username.length < 3) {
+      errors.push("Username must be at least 3 characters long");
+    } else if (username.length > 20) {
+      errors.push("Username must be less than 20 characters");
+    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      errors.push(
+        "Username can only contain letters, numbers, and underscores"
+      );
+    }
+
+    if (!email || email.trim().length === 0) {
+      errors.push("Email is required");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push("Please provide a valid email address");
+    }
+
+    if (!password) {
+      errors.push("Password is required");
+    } else if (password.length < 6) {
+      errors.push("Password must be at least 6 characters long");
+    } else if (password.length > 128) {
+      errors.push("Password must be less than 128 characters");
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
   }
 
-  validateImdbId(data) {
-    const schema = Joi.object({
-      imdbID: Joi.string()
-        .pattern(/^tt\d+$/)
-        .required()
-        .messages({
-          'string.pattern.base': 'Invalid IMDB ID format',
-          'any.required': 'IMDB ID is required'
-        })
-    });
+  static validateLoginData({ username, password }) {
+    const errors = [];
 
-    return schema.validate(data, { abortEarly: false });
+    if (!username || username.trim().length === 0) {
+      errors.push("Username or email is required");
+    }
+
+    if (!password || password.trim().length === 0) {
+      errors.push("Password is required");
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  static sanitizeInput(input) {
+    if (typeof input !== "string") return input;
+    return input.trim().replace(/[<>]/g, "");
+  }
+
+  static validatePaginationParams({ page, limit }) {
+    const errors = [];
+    const cleanPage = parseInt(page) || 1;
+    const cleanLimit = parseInt(limit) || 10;
+
+    if (cleanPage < 1) {
+      errors.push("Page must be greater than 0");
+    }
+
+    if (cleanLimit < 1 || cleanLimit > 100) {
+      errors.push("Limit must be between 1 and 100");
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      page: cleanPage,
+      limit: cleanLimit,
+    };
   }
 }
 
-module.exports = new ValidationHelper();
+module.exports = ValidationHelper;

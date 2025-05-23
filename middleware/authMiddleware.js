@@ -1,44 +1,48 @@
-const { verifyToken } = require('../helpers/jwtHelper');
-const userRepository = require('../repositories/userRepository');
+const authHelper = require("../helpers/authHelper");
+const userRepository = require("../repositories/userRepository");
+const responseHelper = require("../helpers/responseHelper");
 
-const authMiddleware = async (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
+    const authHeader = req.header("Authorization");
+    const token = authHelper.extractTokenFromHeader(authHeader);
+
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. No token provided.'
-      });
+      return responseHelper.unauthorized(res, "No token, authorization denied");
     }
 
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. Invalid token.'
-      });
+    const decoded = authHelper.verifyToken(token);
+
+    const user = await userRepository.findById(decoded.user.id);
+    if (!user) {
+      return responseHelper.unauthorized(res, "Token is no longer valid");
     }
 
-    const userResult = await userRepository.findUserById(decoded.userId);
-    if (!userResult.success || !userResult.data) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. User not found.'
-      });
-    }
-
-    req.user = userResult.data;
+    req.user = decoded.user;
     next();
-
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Access denied. Invalid token.',
-      error: error.message
-    });
+    console.error("Auth middleware error:", error);
+    return responseHelper.unauthorized(res, "Token is not valid");
   }
 };
 
-module.exports = authMiddleware;
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.header("Authorization");
+    const token = authHelper.extractTokenFromHeader(authHeader);
+
+    if (token) {
+      const decoded = authHelper.verifyToken(token);
+      req.user = decoded.user;
+    }
+
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
+module.exports = {
+  auth,
+  optionalAuth,
+};

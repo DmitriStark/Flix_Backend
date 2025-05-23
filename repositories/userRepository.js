@@ -1,85 +1,122 @@
-const User = require('../models/User');
+const User = require("../models/User");
 
 class UserRepository {
-  async createUser(userData) {
+  async findByUsernameOrEmail(username, email) {
     try {
-      const user = new User(userData);
-      const savedUser = await user.save();
-      return {
-        success: true,
-        data: {
-          id: savedUser._id,
-          username: savedUser.username,
-          isRegistered: savedUser.isRegistered,
-          createdAt: savedUser.createdAt
-        }
-      };
+      const user = await User.findOne({
+        $or: [{ email }, { username }],
+      });
+      return user;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error(
+        "Repository - Find user by username or email error:",
+        error
+      );
+      throw error;
     }
   }
 
-  async findUserByUsername(username) {
+  async findByUsernameOrEmailWithPassword(identifier) {
+    try {
+      const user = await User.findOne({
+        $or: [{ username: identifier }, { email: identifier }],
+      }).select("+password");
+      return user;
+    } catch (error) {
+      console.error("Repository - Find user with password error:", error);
+      throw error;
+    }
+  }
+
+  async findByUsername(username) {
     try {
       const user = await User.findOne({ username });
-      return {
-        success: true,
-        data: user
-      };
+      return user;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error("Repository - Find user by username error:", error);
+      throw error;
     }
   }
 
-  async findUserById(userId) {
+  async findById(id) {
     try {
-      const user = await User.findById(userId).select('-password');
-      return {
-        success: true,
-        data: user
-      };
+      const user = await User.findById(id);
+      return user;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error("Repository - Find user by ID error:", error);
+      throw error;
     }
   }
 
-  async updateUserRegistrationStatus(userId, isRegistered = true) {
+  async createUser(userData) {
     try {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { isRegistered, lastLogin: new Date() },
-        { new: true, select: '-password' }
-      );
-      return {
-        success: true,
-        data: user
-      };
+      console.log("User object before save:", {
+        username: userData.username,
+        email: userData.email,
+        password: userData.password,
+      });
+
+      const user = new User(userData);
+      await user.save();
+
+      console.log("User saved. Retrieving from database...");
+
+      const savedUser = await User.findOne({ username: userData.username });
+      console.log("Retrieved user from database:", {
+        username: savedUser.username,
+        password: savedUser.password,
+      });
+
+      return savedUser;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error("Repository - Create user error:", error);
+      throw error;
     }
   }
 
-  async updateLastLogin(userId) {
+  async updateUser(id, updateData) {
     try {
-      await User.findByIdAndUpdate(userId, { lastLogin: new Date() });
-      return { success: true };
+      const user = await User.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true,
+      });
+      return user;
     } catch (error) {
+      console.error("Repository - Update user error:", error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id) {
+    try {
+      const user = await User.findByIdAndDelete(id);
+      return user;
+    } catch (error) {
+      console.error("Repository - Delete user error:", error);
+      throw error;
+    }
+  }
+
+  async getAllUsers(page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+      const users = await User.find()
+        .select("-password")
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 });
+
+      const total = await User.countDocuments();
+
       return {
-        success: false,
-        error: error.message
+        users,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
       };
+    } catch (error) {
+      console.error("Repository - Get all users error:", error);
+      throw error;
     }
   }
 }

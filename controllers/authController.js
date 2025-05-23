@@ -1,170 +1,137 @@
-const userRepository = require('../repositories/userRepository');
-const { generateToken, verifyToken } = require('../helpers/jwtHelper');
-const { validateRegistration, validateLogin } = require('../helpers/validationHelper');
+const userRepository = require("../repositories/userRepository");
+const authHelper = require("../helpers/authHelper");
+const responseHelper = require("../helpers/responseHelper");
 
 class AuthController {
   async register(req, res) {
     try {
-      const { error, value } = validateRegistration(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.details.map(detail => detail.message)
-        });
-      }
+      const { username, email, password } = req.body;
 
-      const { username, password } = value;
-
-      const existingUserResult = await userRepository.findUserByUsername(username);
-      if (existingUserResult.success && existingUserResult.data) {
-        return res.status(409).json({
-          success: false,
-          message: 'Username already exists'
-        });
-      }
-
-      const createUserResult = await userRepository.createUser({
+      const existingUser = await userRepository.findByUsernameOrEmail(
         username,
-        password,
-        isRegistered: true
-      });
-
-      if (!createUserResult.success) {
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to create user',
-          error: createUserResult.error
-        });
+        email
+      );
+      if (existingUser) {
+        return responseHelper.badRequest(res, "User already exists");
       }
 
-      const token = generateToken({
-        userId: createUserResult.data.id,
-        username: createUserResult.data.username
+      const hashedPassword = await authHelper.hashPassword(password);
+
+      const userData = {
+        username,
+        email,
+        password: hashedPassword,
+      };
+
+      const user = await userRepository.createUser(userData);
+
+      const token = authHelper.generateToken({
+        id: user.id,
+        username: user.username,
+        email: user.email,
       });
 
-      res.status(201).json({
-        success: true,
-        message: 'User registered successfully',
-        data: {
-          user: createUserResult.data,
-          token
-        }
-      });
-
+      return responseHelper.created(
+        res,
+        {
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+          },
+        },
+        "User registered successfully"
+      );
     } catch (error) {
-      console.error('Registration error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+      console.error("Registration error:", error);
+      return responseHelper.serverError(
+        res,
+        "Server error during registration"
+      );
     }
   }
 
   async login(req, res) {
     try {
-      const { error, value } = validateLogin(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.details.map(detail => detail.message)
-        });
+      const { username, password } = req.body;
+
+      console.log("=== LOGIN DEBUG ===");
+      console.log("Login attempt for username:", username);
+
+      if (!username || !password) {
+        return responseHelper.badRequest(
+          res,
+          "Username and password are required"
+        );
       }
 
-      const { username, password } = value;
+      const user = await userRepository.findByUsernameOrEmailWithPassword(
+        username
+      );
 
-      const userResult = await userRepository.findUserByUsername(username);
-      if (!userResult.success || !userResult.data) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid username or password'
-        });
+      console.log(
+        "Database query result:",
+        user ? "User found" : "User not found"
+      );
+
+      if (!user) {
+        return responseHelper.badRequest(res, "Invalid credentials");
       }
 
-      const user = userResult.data;
+      const isMatch = await authHelper.comparePassword(password, user.password);
+      console.log("Password match result:", isMatch);
 
-      const isPasswordValid = await user.comparePassword(password);
-      if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid username or password'
-        });
-      }
-
-      await userRepository.updateLastLogin(user._id);
-
-      const token = generateToken({
-        userId: user._id,
-        username: user.username
-      });
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        data: {
-          user: {
-            id: user._id,
-            username: user.username,
-            isRegistered: user.isRegistered
-          },
-          token
+      if (!isMatch) {
+        if (!user.password) {
+          console.log("ERROR: No password field in user document!");
         }
+        return responseHelper.badRequest(res, "Invalid credentials");
+      }
+
+      const token = authHelper.generateToken({
+        id: user.id,
+        username: user.username,
+        email: user.email,
       });
 
+      return responseHelper.success(
+        res,
+        {
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+          },
+        },
+        "Login successful"
+      );
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+      console.error("Login error:", error);
+      return responseHelper.serverError(res, "Server error during login");
     }
   }
 
-  async verifyToken(req, res) {
+  async debugUser(req, res) {
     try {
-      const token = req.headers.authorization?.replace('Bearer ', '');
-      
-      if (!token) {
-        return res.status(401).json({
-          success: false,
-          message: 'No token provided'
-        });
-      }
+      const user = await userRepository.findByUsername(req.params.username);
 
-      const decoded = verifyToken(token);
-      if (!decoded) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid token'
-        });
-      }
-
-      const userResult = await userRepository.findUserById(decoded.userId);
-      if (!userResult.success || !userResult.data) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Token is valid',
-        data: {
-          user: userResult.data
-        }
+      return responseHelper.success(res, {
+        found: !!user,
+        user: user
+          ? {
+              id: user._id,
+              username: user.username,
+              email: user.email,
+              hasPassword: !!user.password,
+              passwordHash: user.password,
+              createdAt: user.createdAt,
+            }
+          : null,
       });
-
     } catch (error) {
-      console.error('Token verification error:', error);
-      res.status(401).json({
-        success: false,
-        message: 'Token verification failed',
-        error: error.message
-      });
+      return responseHelper.serverError(res, error.message);
     }
   }
 }
