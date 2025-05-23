@@ -1,167 +1,79 @@
-const movieRepository = require('../repositories/movieRepository');
-const { validateMovieSearch } = require('../helpers/validationHelper');
+const movieRepository = require("../repositories/movieRepository");
+const responseHelper = require("../helpers/responseHelper");
 
 class MovieController {
   async searchMovies(req, res) {
     try {
-      const { error, value } = validateMovieSearch(req.query);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.details.map(detail => detail.message)
+      const { search, type, year } = req.query;
+
+      const result = await movieRepository.searchMovies({ search, type, year });
+
+      if (result.success) {
+        return responseHelper.success(res, {
+          movies: result.movies,
+          message: `Found ${result.movies.length} movies`,
         });
+      } else {
+        return responseHelper.notFound(res, result.message, { movies: [] });
       }
-
-      const searchResult = await movieRepository.searchMovies(value);
-      
-      if (!searchResult.success) {
-        return res.status(404).json({
-          success: false,
-          message: searchResult.error
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Movies retrieved successfully',
-        data: searchResult.data
-      });
-
     } catch (error) {
-      console.error('Movie search error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+      console.error("Movie search error:", error);
+      return responseHelper.serverError(res, "Failed to search movies");
+    }
+  }
+
+  async getPopularMovies(req, res) {
+    try {
+      const result = await movieRepository.getPopularMovies();
+
+      if (result.success) {
+        return responseHelper.success(res, {
+          movies: result.movies,
+          category: "Popular Movies",
+        });
+      } else {
+        return responseHelper.notFound(res, result.message, { movies: [] });
+      }
+    } catch (error) {
+      console.error("Popular movies error:", error);
+      return responseHelper.serverError(res, "Failed to fetch popular movies");
+    }
+  }
+
+  async getNewMovies(req, res) {
+    try {
+      const result = await movieRepository.getNewMovies();
+
+      if (result.success) {
+        return responseHelper.success(res, {
+          movies: result.movies,
+          category: "New Movies",
+        });
+      } else {
+        return responseHelper.notFound(res, result.message, { movies: [] });
+      }
+    } catch (error) {
+      console.error("New movies error:", error);
+      return responseHelper.serverError(res, "Failed to fetch new movies");
     }
   }
 
   async getMovieDetails(req, res) {
     try {
       const { imdbID } = req.params;
-      
-      if (!imdbID) {
-        return res.status(400).json({
-          success: false,
-          message: 'IMDB ID is required'
+
+      const result = await movieRepository.getMovieDetails(imdbID);
+
+      if (result.success) {
+        return responseHelper.success(res, {
+          movie: result.movie,
         });
+      } else {
+        return responseHelper.notFound(res, result.message);
       }
-
-      const movieResult = await movieRepository.getMovieById(imdbID);
-      
-      if (!movieResult.success) {
-        return res.status(404).json({
-          success: false,
-          message: movieResult.error
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Movie details retrieved successfully',
-        data: movieResult.data
-      });
-
     } catch (error) {
-      console.error('Movie details error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  async getDefaultMovies(req, res) {
-    try {
-      const moviesResult = await movieRepository.getDefaultMovies();
-      
-      if (!moviesResult.success) {
-        return res.status(500).json({
-          success: false,
-          message: moviesResult.error
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Default movies retrieved successfully',
-        data: moviesResult.data
-      });
-
-    } catch (error) {
-      console.error('Default movies error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  async getRecommendedMovies(req, res) {
-    try {
-      const searchResult = await movieRepository.searchMovies({
-        search: 'superhero',
-        type: 'movie'
-      });
-      
-      if (!searchResult.success) {
-        return res.status(404).json({
-          success: false,
-          message: 'No recommended movies found'
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Recommended movies retrieved successfully',
-        data: {
-          movies: searchResult.data.movies
-        }
-      });
-
-    } catch (error) {
-      console.error('Recommended movies error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  async getNewMovies(req, res) {
-    try {
-      const searchResult = await movieRepository.searchMovies({
-        search: 'action',
-        type: 'movie'
-      });
-      
-      if (!searchResult.success) {
-        return res.status(404).json({
-          success: false,
-          message: 'No new movies found'
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'New movies retrieved successfully',
-        data: {
-          movies: searchResult.data.movies
-        }
-      });
-
-    } catch (error) {
-      console.error('New movies error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+      console.error("Movie details error:", error);
+      return responseHelper.serverError(res, "Failed to fetch movie details");
     }
   }
 }

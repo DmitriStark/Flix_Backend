@@ -1,104 +1,68 @@
-const axios = require('axios');
+const omdbService = require("../services/omdbService");
 
 class MovieRepository {
-  constructor() {
-    this.baseURL = 'http://www.omdbapi.com/';
-    this.apiKey = process.env.OMDB_API_KEY;
-  }
-
   async searchMovies(searchParams) {
     try {
-      const { search, type = 'movie', year, page = 1 } = searchParams;
-      
-      const params = {
-        apikey: this.apiKey,
-        s: search,
-        type: type,
-        page: page
-      };
-
-      if (year) {
-        params.y = year;
-      }
-
-      const response = await axios.get(this.baseURL, { params });
-      
-      if (response.data.Response === 'True') {
-        return {
-          success: true,
-          data: {
-            movies: response.data.Search || [],
-            totalResults: response.data.totalResults || 0,
-            page: page
-          }
-        };
-      } else {
-        return {
-          success: false,
-          error: response.data.Error || 'No movies found'
-        };
-      }
+      const result = await omdbService.searchMovies(searchParams);
+      return result;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message || 'Failed to fetch movies'
-      };
+      console.error("Repository - Movie search error:", error);
+      throw error;
     }
   }
 
-  async getMovieById(imdbID) {
+  async getPopularMovies() {
     try {
-      const params = {
-        apikey: this.apiKey,
-        i: imdbID,
-        plot: 'full'
-      };
-
-      const response = await axios.get(this.baseURL, { params });
-      
-      if (response.data.Response === 'True') {
-        return {
-          success: true,
-          data: response.data
-        };
-      } else {
-        return {
-          success: false,
-          error: response.data.Error || 'Movie not found'
-        };
-      }
+      const result = await omdbService.getPopularMovies();
+      return result;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message || 'Failed to fetch movie details'
-      };
+      console.error("Repository - Popular movies error:", error);
+      throw error;
     }
   }
 
-  async getDefaultMovies() {
+  async getNewMovies() {
     try {
-      const superheroMovies = await this.searchMovies({ 
-        search: 'superhero', 
-        type: 'movie' 
-      });
-      
-      const actionMovies = await this.searchMovies({ 
-        search: 'action', 
-        type: 'movie' 
-      });
-
-      return {
-        success: true,
-        data: {
-          recommended: superheroMovies.success ? superheroMovies.data.movies : [],
-          newMovies: actionMovies.success ? actionMovies.data.movies : []
-        }
-      };
+      const result = await omdbService.getNewMovies();
+      return result;
     } catch (error) {
-      return {
-        success: false,
-        error: error.message || 'Failed to fetch default movies'
-      };
+      console.error("Repository - New movies error:", error);
+      throw error;
+    }
+  }
+
+  async getMovieDetails(imdbID) {
+    try {
+      if (!imdbID) {
+        return {
+          success: false,
+          message: "IMDB ID is required",
+        };
+      }
+
+      const result = await omdbService.getMovieDetails(imdbID);
+      return result;
+    } catch (error) {
+      console.error("Repository - Movie details error:", error);
+      throw error;
+    }
+  }
+
+  // Additional repository methods can be added here
+  // For example: caching, data transformation, etc.
+
+  async getMoviesByGenre(genre) {
+    try {
+      // This could be implemented if omdbService supports it
+      // or if you want to filter existing search results
+      const result = await omdbService.searchMovies({
+        search: genre,
+        type: "movie",
+      });
+      return result;
+    } catch (error) {
+      console.error("Repository - Movies by genre error:", error);
+      throw error;
     }
   }
 }
