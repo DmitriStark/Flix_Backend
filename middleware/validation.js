@@ -11,15 +11,11 @@ const registerSchema = Joi.object({
         "Username must contain uppercase and lowercase letters",
       "any.required": "Username is required",
     }),
-
-  email: Joi.string().email().required().messages({
-    "string.email": "Invalid email format",
-    "any.required": "Email is required",
-  }),
-
   password: Joi.string()
     .min(6)
-    .pattern(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .pattern(
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@!$%*?&])[A-Za-z\d@!$%*?&]+$/
+    )
     .required()
     .messages({
       "string.min": "Password must be at least 6 characters",
@@ -52,13 +48,10 @@ const movieSearchSchema = Joi.object({
 
 const validate = (schema) => {
   return (req, res, next) => {
-    console.log("Validating data:", req.body);
-
     const dataToValidate = req.method === "GET" ? req.query : req.body;
     const { error } = schema.validate(dataToValidate);
 
     if (error) {
-      console.log("Validation error:", error.details);
       return res.status(400).json({
         success: false,
         message: error.details[0].message,
@@ -69,7 +62,6 @@ const validate = (schema) => {
       });
     }
 
-    console.log("Validation passed");
     next();
   };
 };

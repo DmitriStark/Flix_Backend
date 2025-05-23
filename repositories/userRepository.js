@@ -1,26 +1,9 @@
 const User = require("../models/User");
 
 class UserRepository {
-  async findByUsernameOrEmail(username, email) {
+  async findByUsernameWithPassword(username) {
     try {
-      const user = await User.findOne({
-        $or: [{ email }, { username }],
-      });
-      return user;
-    } catch (error) {
-      console.error(
-        "Repository - Find user by username or email error:",
-        error
-      );
-      throw error;
-    }
-  }
-
-  async findByUsernameOrEmailWithPassword(identifier) {
-    try {
-      const user = await User.findOne({
-        $or: [{ username: identifier }, { email: identifier }],
-      }).select("+password");
+      const user = await User.findOne({ username }).select("+password");
       return user;
     } catch (error) {
       console.error("Repository - Find user with password error:", error);
@@ -52,7 +35,6 @@ class UserRepository {
     try {
       console.log("User object before save:", {
         username: userData.username,
-        email: userData.email,
         password: userData.password,
       });
 

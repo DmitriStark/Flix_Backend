@@ -5,12 +5,9 @@ const responseHelper = require("../helpers/responseHelper");
 class AuthController {
   async register(req, res) {
     try {
-      const { username, email, password } = req.body;
+      const { username, password } = req.body;
 
-      const existingUser = await userRepository.findByUsernameOrEmail(
-        username,
-        email
-      );
+      const existingUser = await userRepository.findByUsername(username);
       if (existingUser) {
         return responseHelper.badRequest(res, "User already exists");
       }
@@ -19,7 +16,6 @@ class AuthController {
 
       const userData = {
         username,
-        email,
         password: hashedPassword,
       };
 
@@ -28,7 +24,6 @@ class AuthController {
       const token = authHelper.generateToken({
         id: user.id,
         username: user.username,
-        email: user.email,
       });
 
       return responseHelper.created(
@@ -38,7 +33,6 @@ class AuthController {
           user: {
             id: user.id,
             username: user.username,
-            email: user.email,
           },
         },
         "User registered successfully"
@@ -66,9 +60,7 @@ class AuthController {
         );
       }
 
-      const user = await userRepository.findByUsernameOrEmailWithPassword(
-        username
-      );
+      const user = await userRepository.findByUsernameWithPassword(username);
 
       console.log(
         "Database query result:",
@@ -92,7 +84,6 @@ class AuthController {
       const token = authHelper.generateToken({
         id: user.id,
         username: user.username,
-        email: user.email,
       });
 
       return responseHelper.success(
@@ -102,7 +93,6 @@ class AuthController {
           user: {
             id: user.id,
             username: user.username,
-            email: user.email,
           },
         },
         "Login successful"
@@ -123,7 +113,6 @@ class AuthController {
           ? {
               id: user._id,
               username: user.username,
-              email: user.email,
               hasPassword: !!user.password,
               passwordHash: user.password,
               createdAt: user.createdAt,
